@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +9,6 @@ public class MacroMemoryScript : MonoBehaviour {
 
     public KMAudio Audio;
     public KMBombModule module;
-    public KMBombInfo info;
     public GameObject[] buttonobjs;
     public KMSelectable[] buttons;
     public Renderer[] leds;
@@ -27,6 +26,7 @@ public class MacroMemoryScript : MonoBehaviour {
 
     private static int moduleIDCounter;
     private int moduleID;
+    private static int min;
     private int modInstance;
     private static bool[] moduleSolved;
     private static bool next = true;
@@ -43,12 +43,12 @@ public class MacroMemoryScript : MonoBehaviour {
     private IEnumerator Activate()
     {
         moduleID = ++moduleIDCounter;
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForSeconds(0.2f);
         if (moduleID == moduleIDCounter)
         {
             values.Clear();
             presses.Clear();
-            selectedmod[0] = info.GetSolvableModuleNames().Count(x => x == "Macro Memory");
+            selectedmod[0] = moduleID - min;
             advance = new bool[selectedmod[0]];
             moduleSolved = new bool[selectedmod[0]];
             stage = new int[selectedmod[0]];
@@ -56,6 +56,7 @@ public class MacroMemoryScript : MonoBehaviour {
                 values.Add(i);
             values = values.Shuffle();
             selectedmod[1] = Random.Range(0, selectedmod[0]);
+            min = moduleID;
         }
         tpon = TwitchPlaysActive;
         modInstance = moduleIDCounter - moduleID;
@@ -139,7 +140,7 @@ public class MacroMemoryScript : MonoBehaviour {
                 {
                     default: pass = m == values.IndexOf(1) / 4 && b == 2; break;
                     case 1: pass = m == values.IndexOf(2) / 4 && b == presses.First(x => x[1] == selectedmod[1])[2]; break;
-                    case 2: pass = l == presses.First(x => x[1] == selectedmod[1])[1]; break;
+                    case 2: pass = l == presses.Where(x => x[1] == selectedmod[1]).ToArray()[1][0]; break;
                     case 3: pass = m == values.IndexOf(3) / 4 && b == presses.Last()[2]; break;
                     case 4: pass = m == values.IndexOf(0) / 4 && b == presses.Where(x => x[1] == selectedmod[1]).ToArray()[2][2]; break;
                 }
@@ -200,7 +201,8 @@ public class MacroMemoryScript : MonoBehaviour {
 
     private IEnumerator Advance()
     {
-        Debug.LogFormat("[Macro Memory #{0}] Button {1} in position {2} on module {3} pressed. {4}.", moduleID, push[0] + 1, push[2] + 1, moduleIDCounter - push[1], pass ? "Correct" : "Incorrect");
+        if(!moduleSolved[modInstance])
+            Debug.LogFormat("[Macro Memory #{0}] Button {1} in position {2} on module {3} pressed. {4}.", moduleID, push[0] + 1, push[2] + 1, moduleIDCounter - push[1], pass ? "Correct" : "Incorrect");
         if (modInstance == selectedmod[1])
         {
             labels[0].text = string.Empty;
@@ -225,9 +227,9 @@ public class MacroMemoryScript : MonoBehaviour {
                 presses.Clear();
             }
         }
-        else if (pass)
+        else if (pass && !moduleSolved[modInstance])
         {
-            if (stage[modInstance] > 4)
+            if (stage[selectedmod[1]] > 4)
                 Debug.LogFormat("[Macro Memory #{0}] Module {1} solved.", moduleID, moduleIDCounter - selectedmod[1]);
             else
                 Debug.LogFormat("[Macro Memory #{0}] Module {2} advances to stage {1}.", moduleID, stage[selectedmod[1]] + 1, moduleIDCounter - selectedmod[1]);
@@ -237,7 +239,7 @@ public class MacroMemoryScript : MonoBehaviour {
             yield return new WaitForSeconds(0.1f);
             buttonobjs[i].transform.localPosition -= new Vector3(0, 0.03f, 0);
         }
-        if(moduleSolved.Any(x => x == false))
+        if (moduleSolved.Any(x => x == false))
         {
             if (!pass && !moduleSolved[modInstance])
             {
@@ -246,7 +248,7 @@ public class MacroMemoryScript : MonoBehaviour {
             }
             if (modInstance == selectedmod[1])
             {
-                if(!moduleSolved[modInstance])
+                if (!moduleSolved[modInstance])
                     leds[stage[modInstance]].material = onoff[0];
                 values = values.Shuffle();
                 selectedmod[1] = Random.Range(0, selectedmod[0]);
@@ -262,6 +264,7 @@ public class MacroMemoryScript : MonoBehaviour {
             }
             while (!next)
                 yield return null;
+            yield return new WaitForSeconds(0.2f);
             for (int i = 0; i < 4; i++)
             {
                 Label(values[(4 * modInstance) + i] + 1, i + 1);
@@ -273,9 +276,11 @@ public class MacroMemoryScript : MonoBehaviour {
                 labels[0].text = (rule + 1).ToString();
                 Debug.LogFormat("[Macro Memory #{0}] Activation {1}/Stage {2}: The displayed digit is {3}.", moduleID, presses.Count() + 1, stage[modInstance] + 1, rule + 1);
             }
-            else
+            else if(!moduleSolved[modInstance])
                 Debug.LogFormat("[Macro Memory #{0}] Activation {1}: The digit {2} is displayed on module {3}.", moduleID, presses.Count() + 1, rule + 1, moduleIDCounter - selectedmod[1]);
-        }      
+        }
+        else
+            next = true;
     }
 
     bool TwitchPlaysActive;
